@@ -24,14 +24,26 @@ train, test = data[:, :, :8], data[:, :, 8:]  # 8:2 Split.
 train_flat, test_flat = train.reshape(2576, 52*8).T, test.reshape(2576, 52*2).T
 train_y, test_y = Y[:, :8].flatten(), Y[:, 8:].flatten()
 
-# # Visualize the images
-# fig, axes = plt.subplots(3, 10, figsize=(20, 6))
-# for i, ax in enumerate(axes.flat):
-#     ax.imshow(data.reshape(2576, 520)[:, i].reshape(46, 56).T, cmap='gray')
-#     ax.set_title(f'Image {i+1}')
-#     ax.axis('off')
-# plt.tight_layout()
-# plt.show()
+# Visualize the images
+def show_arr_imgs(arr):
+    fig, axes = plt.subplots(1, 5, figsize=(20, 6))
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(arr[i].reshape(46, 56).T, cmap='gray')
+        ax.set_title(f'Image {i+1}')
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+    
+def show_graph(data):
+    x_values = np.arange(len(data))
+    
+    plt.figure(figsize=(8, 8))  # Adjust the figure size if necessary
+    plt.plot(x_values, data, marker='.', color='b', linewidth=1, markersize=0)
+    
+    plt.ylabel('Eigenvalue')
+    
+    plt.tight_layout()
+    plt.show()
 
 # def recons_ori(inp_norm, eigen_vec, top_m):
 #     out = 0
@@ -48,9 +60,6 @@ train_y, test_y = Y[:, :8].flatten(), Y[:, 8:].flatten()
 #     ax.axis('off')
 # plt.tight_layout()
 # plt.show()
-
-# The mean (avg) image
-mean_img = train_flat.mean(axis=0)
 
 
 def recons(inp_norm, eigen_vec, top_m):
@@ -88,12 +97,16 @@ def plot_eigenvalues(top_eigenval):
     
 def make_2pix_feat(ori_vec):
     combina = list(itertools.combinations(range(len(ori_vec)), 2))
-    result_arrays = ori_vec.tolist()
+    # result_arrays = ori_vec.tolist()
+    result_arrays = []
     for comb in combina:
         dim1, dim2 = comb
         diff_array = ori_vec[dim1] - ori_vec[dim2]
         result_arrays.append(diff_array)
-    return result_arrays
+    return np.array(result_arrays)
+
+# The mean (avg) image
+mean_img = train_flat.mean(axis=0)
     
 A_vec = train_flat - mean_img[np.newaxis, :]
 
@@ -113,70 +126,61 @@ sorted_eigenvec = eigenvectors[:, sorted_indices]
 
 
 # Count the number of positive elements
-# count_positive = np.sum(sorted_eigenvalues > 0)
+count_positive = np.sum(sorted_eigenvalues > 0)
 
 # Compare eigenvalues, eigenvectors of 2 ways
-# diff_values = sorted_eigenvalues[:250] - sorted_eigenvalues_2[:250]
 # print(np.linalg.norm(diff_values))
 
-# # reconstruct single image
-# pic1_re = mean_img + recons(A_vec[0], sorted_eigenvec, 200)
+# reconstruct single image
+# pic1_re = mean_img + recons(A_vec[0], sorted_eigenvec, 100)
 
 # ## BRUTE FORCE FOR BEST RESULT
-combinations = itertools.product(range(60, 135, 5), range(5, 11), range(0, 3))
+combinations = itertools.product(range(150, 500, 10), range(5, 11), range(0, 3))
 
 top_m = 100
 # turn train images to projections (extract 2D to PC features),
 train_projs = [np.dot(norm_img, sorted_eigenvec[:, :top_m])
                for norm_img in A_vec]
-train_2pixS = [make_2pix_feat(vec) for vec in train_projs]
+# train_2pixS = [make_2pix_feat(vec) for vec in train_projs]
 
 
 # norm test data
 test_norm = test_flat - mean_img[np.newaxis, :]
 test_projs = [np.dot(norm_img, sorted_eigenvec[:, :top_m])
               for norm_img in test_norm]
-test_2pixS = [make_2pix_feat(vec) for vec in test_projs]
+# test_2pixS = [make_2pix_feat(vec) for vec in test_projs]
 
-max_acc = 0
 
-for n_est, d_depth, rand_s in combinations:
-    # reconstruct for all train set, calc recon error.
-    
-    # train_recon = [mean_img + recons(norm_img, sorted_eigenvec, top_m)
-    #                for norm_img in A_vec]
-    # train_rec_err = np.mean(np.linalg.norm(train_flat-train_recon, ord=2, axis=1))
-    
-    
-    # learn KNN Classifier using train data
-    # neigh = KNeighborsClassifier(n_nb, weights='distance', metric='cosine')
-    # neigh.fit(train_projs, train_y)
+# reconstruct for all train set, calc recon error.
 
-    # Predict with KNN
-    # test_pred = neigh.predict(test_projs)
-    # test_acc = accuracy_score(test_y, test_pred)
-    # print('KNN test acc: ', test_acc)  # M = 100, K = 3 gave best acc.
-    # print(precision_recall_fscore_support(test_y, test_pred, average='macro'))
-    
-    # Calculate the confusion matrix
-    # confusion_matrix = confusion_matrix(test_y, test_pred)
-    
-    # Random Forest. Then learn to fit
-    rfc = RandomForestClassifier(n_estimators=n_est, 
-                                  max_depth=d_depth, 
-                                  max_features = 'sqrt', 
-                                  random_state=rand_s)
-    rfc.fit(train_2pixS, train_y)
-    
-    # Predict with RF
-    test_pred = rfc.predict(test_2pixS)
-    test_acc = accuracy_score(test_y, test_pred)
-    
-    if test_acc > max_acc:
-        max_acc = test_acc
-        print('rfc acc:', test_acc)
-        print(f'{n_est} {d_depth} {rand_s}')
-        
+# train_recon = [mean_img + recons(norm_img, sorted_eigenvec, top_m)
+#                for norm_img in A_vec]
+# train_rec_err = np.mean(np.linalg.norm(train_flat-train_recon, ord=2, axis=1))
+
+
+# learn KNN Classifier using train data
+# neigh = KNeighborsClassifier(n_nb, weights='distance', metric='cosine')
+# neigh.fit(train_projs, train_y)
+
+# Predict with KNN
+# test_pred = neigh.predict(test_projs)
+# test_acc = accuracy_score(test_y, test_pred)
+# print('KNN test acc: ', test_acc)  # M = 100, K = 3 gave best acc.
+# print(precision_recall_fscore_support(test_y, test_pred, average='macro'))
+
+# Calculate the confusion matrix
+# confusion_matrix = confusion_matrix(test_y, test_pred)
+
+# Random Forest. Then learn to fit
+rfc = RandomForestClassifier(n_estimators=360, 
+                              max_depth=10, 
+                              max_features = 'sqrt', 
+                              random_state=0)
+rfc.fit(train_projs, train_y)
+
+# Predict with RF
+test_pred = rfc.predict(test_projs)
+test_acc = accuracy_score(test_y, test_pred)
     
     
     
