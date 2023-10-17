@@ -171,6 +171,48 @@ test_projs = [np.dot(norm_img, sorted_eigenvec[:, :top_m])
 # Calculate the confusion matrix
 # confusion_matrix = confusion_matrix(test_y, test_pred)
 
+'''
+### Q2 - Incremental PCA
+
+# Split training data into n_sub subsets
+n_sub = 4
+train_subsets = np.array(np.array_split(train_flat, n_sub))
+
+models = []
+for i in range(n_sub):
+    subset_mean = train_subsets[i].mean(axis=0)
+    subset_N = len(train_subsets[i])
+
+    subset_A_vec = train_subsets[i] - subset_mean[np.newaxis, :]
+    subset_cov_matrix = subset_A_vec.T.dot(subset_A_vec)/subset_N
+    subset_eigenvalues, subset_eigenvectors = np.linalg.eig(subset_cov_matrix)
+    subset_eigenvalues, subset_eigenvectors = np.real(subset_eigenvalues), np.real(subset_eigenvectors)
+
+    subset_sorted_indices = np.argsort(subset_eigenvalues)[::-1]
+    subset_sorted_eigenvalues = subset_eigenvalues[subset_sorted_indices]
+    subset_sorted_eigenvec = subset_eigenvectors[:, subset_sorted_indices]
+
+    models.append((subset_mean, subset_N, subset_sorted_eigenvec, subset_sorted_eigenvalues))
+
+# models[0] is PCA trained only by the first subset:
+s1_mean, s1_N, s1_sorted_eigenvec, s1_sorted_eigenvalues = models[0]
+s1_A_vec = train_subsets[0] - s1_mean[np.newaxis, :]
+s1_train_projs = [np.dot(norm_img, s1_sorted_eigenvec[:, :top_m])
+               for norm_img in s1_A_vec]
+
+# print(s1_train_projs[0].shape, len(s1_train_projs))
+s1_test_norm = test_flat - s1_mean[np.newaxis, :]
+s1_test_projs = [np.dot(norm_img, s1_sorted_eigenvec[:, :top_m])
+              for norm_img in s1_test_norm]
+
+# print(s1_test_projs[0].shape, len(s1_test_projs))
+
+s1_train_recon = [s1_mean + recons(norm_img, s1_sorted_eigenvec, top_m)
+               for norm_img in s1_A_vec]
+train_rec_err = np.mean(np.linalg.norm(train_subsets[0]-s1_train_recon, ord=2, axis=1))
+show_arr_imgs(s1_train_recon[:5])
+'''
+
 # Random Forest. Then learn to fit
 rfc = RandomForestClassifier(n_estimators=360, 
                               max_depth=10, 
