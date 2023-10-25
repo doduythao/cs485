@@ -194,10 +194,9 @@ n_sub = 4
 train_subsets = np.array(np.array_split(train_flat, n_sub))
 
 models = []
-print('Training incremental PCA models...')
+# print('Training incremental PCA models...')
 start_time = time.time()
 for i in range(n_sub):
-    print(f'Training model {i+1}...')
     subset_mean = train_subsets[i].mean(axis=0)
     subset_N = len(train_subsets[i])
 
@@ -208,24 +207,23 @@ for i in range(n_sub):
     # subset_sorted_indices = np.argsort(subset_eigenvalues)[::-1]
     # subset_sorted_eigenvalues = subset_eigenvalues[subset_sorted_indices]
     # subset_sorted_eigenvec = subset_eigenvectors[:, subset_sorted_indices]
-
-    models.append((subset_mean, subset_N, subset_cov_matrix))
     if i==0:
-        pause_time = time.time()
+        s1_pause_time = time.time()
+    models.append((subset_mean, subset_N, subset_cov_matrix))
 
 incremental_models = [models[0]]
 
 for i in range(n_sub-1):
-    print(f'Incrementing model {i+1}...')
     inc_N = incremental_models[-1][1] + models[i+1][1]
     inc_mean = (incremental_models[-1][0]*incremental_models[-1][1] + models[i+1][0]*models[i+1][1])/inc_N
-    inc_cov_matrix = incremental_models[-1][0]/inc_mean * incremental_models[-1][2] + models[i+1][0]/inc_mean * models[i+1][2] + \
-            (incremental_models[-1][1]*models[i+1][1]/inc_N**2) * (incremental_models[-1][0]-models[i+1][0]) * (incremental_models[-1][0]-models[i+1][0]).T
+    inc_cov_matrix = incremental_models[-1][1]/inc_N * incremental_models[-1][2] + models[i+1][1]/inc_N * models[i+1][2] + \
+            (incremental_models[-1][1]*models[i+1][1]/(inc_N**2)) * (incremental_models[-1][0]-models[i+1][0]) * (incremental_models[-1][0]-models[i+1][0]).T
     incremental_models.append((inc_mean, inc_N, inc_cov_matrix))
 
 # models[0] is PCA trained only by the first subset:
-resume_time = time.time()
+inc_pause_time = time.time()
 s1_mean, s1_N, s1_cov_matrix = models[0]
+s1_resume_time = time.time()
 s1_sorted_eigenvalues, s1_sorted_eigenvec = sorted_eigens(s1_cov_matrix)
 s1_A_vec = train_subsets[0] - s1_mean[np.newaxis, :]
 s1_train_projs = [np.dot(norm_img, s1_sorted_eigenvec[:, :top_m])
@@ -236,16 +234,18 @@ s1_test_norm = test_flat - s1_mean[np.newaxis, :]
 s1_test_projs = [np.dot(norm_img, s1_sorted_eigenvec[:, :top_m])
               for norm_img in s1_test_norm]
 s1_end_time = time.time()
-print(f'Time elapsed (1st subset PCA): {s1_end_time-resume_time+pause_time-start_time}s')
+print(f'Time elapsed (1st subset PCA): {s1_end_time-s1_resume_time+s1_pause_time-start_time}s')
 
 # reconstruct for all train set, calc recon error.
 s1_train_recon = [s1_mean + recons(norm_img, s1_sorted_eigenvec, top_m)
                for norm_img in A_vec]
 s1_train_rec_err = np.mean(np.linalg.norm(train_flat-s1_train_recon, ord=2, axis=1))
+# show_arr_imgs(train_flat[:5])
 # show_arr_imgs(s1_train_recon[:5])
 
 
 # incremental_models[-1] is PCA trained by all subsets:
+inc_resume_time = time.time()
 inc_mean, inc_N, inc_cov_matrix = incremental_models[-1]
 inc_sorted_eigenvalues, inc_sorted_eigenvec = sorted_eigens(inc_cov_matrix)
 inc_A_vec = train_flat - inc_mean[np.newaxis, :]
@@ -256,7 +256,7 @@ inc_test_norm = test_flat - inc_mean[np.newaxis, :]
 inc_test_projs = [np.dot(norm_img, inc_sorted_eigenvec[:, :top_m])
               for norm_img in inc_test_norm]
 end_time = time.time()
-print(f'Time elapsed (Incremental PCA): {end_time-start_time}s')
+print(f'Time elapsed (Incremental PCA): {end_time-inc_resume_time+inc_pause_time-start_time}s')
 
 inc_train_recon = [inc_mean + recons(norm_img, inc_sorted_eigenvec, top_m)
                 for norm_img in A_vec]
