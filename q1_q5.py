@@ -238,11 +238,10 @@ s1_test_projs = [np.dot(norm_img, s1_sorted_eigenvec[:, :top_m])
 s1_end_time = time.time()
 print(f'Time elapsed (1st subset PCA): {s1_end_time-resume_time+pause_time-start_time}s')
 
-# print(s1_test_projs[0].shape, len(s1_test_projs))
-
+# reconstruct for all train set, calc recon error.
 s1_train_recon = [s1_mean + recons(norm_img, s1_sorted_eigenvec, top_m)
-               for norm_img in s1_A_vec]
-s1_train_rec_err = np.mean(np.linalg.norm(train_subsets[0]-s1_train_recon, ord=2, axis=1))
+               for norm_img in A_vec]
+s1_train_rec_err = np.mean(np.linalg.norm(train_flat-s1_train_recon, ord=2, axis=1))
 # show_arr_imgs(s1_train_recon[:5])
 
 
@@ -260,7 +259,7 @@ end_time = time.time()
 print(f'Time elapsed (Incremental PCA): {end_time-start_time}s')
 
 inc_train_recon = [inc_mean + recons(norm_img, inc_sorted_eigenvec, top_m)
-                for norm_img in inc_A_vec]
+                for norm_img in A_vec]
 inc_train_rec_err = np.mean(np.linalg.norm(train_flat-inc_train_recon, ord=2, axis=1))
 # show_arr_imgs(inc_train_recon[:5])
 
@@ -268,7 +267,6 @@ print("Reconstruction errors:")
 print(f'Batch PCA: {train_rec_err}')
 print(f'1st subset PCA: {s1_train_rec_err}')
 print(f'Incremental PCA: {inc_train_rec_err}')
-# I'm not sure why incremental PCA has higher reconstruction error than batch PCA, and why is error in 1st subset PCA so small
 
 
 
