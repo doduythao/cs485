@@ -43,7 +43,7 @@ init; clc;
 %% 1. Data loading/generation
 
 % Select dataset among {'Toy_Gaussian', 'Toy_Spiral', 'Toy_Circle', 'Caltech'}
-[data_train, data_test] = getData('Toy_Spiral');
+[data_train, data_test] = getData('Caltech');
 
 %%%%%%%%%%%%%
 % check the training data
