@@ -18,11 +18,12 @@ random.seed(random_seed)
 torch.manual_seed(random_seed)
 im_size = 224
 num_classes = 10
-# net_type = 'alex'
-net_type = 'res'
+net_type = 'alex'
+# net_type = 'res'
 norm = True
 dropout = True
-loss_type = 'entropy'
+# loss_type = 'entropy'
+loss_type = 'hinge'
 lr = 0.001
 num_ep = 200
 
@@ -108,9 +109,7 @@ for epoch in range(num_ep):  # loop over the dataset multiple times
     test_acc = (correct / total)
     if max_test < test_acc:
         max_test = test_acc
-    print(f'Accuracy of network on the test images: {100 * test_acc} % | {max_test}')
-
-print('Finished Training, Start Evaluating')
+    print(f'Accuracy on the test images: {100 * test_acc} % | {max_test}')
 
 
 
