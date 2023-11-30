@@ -7,10 +7,11 @@ Created on Tue Nov 28 18:32:33 2023
 import random
 import torch
 import torch.optim as optim
+from torch.optim import lr_scheduler
 from torch import nn
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split
-from models import AlexNet, ResNet18
+from models import AlexNet, ResNet34
 
 # Set a fixed random seed for reproducibility
 random_seed = 1
@@ -18,14 +19,14 @@ random.seed(random_seed)
 torch.manual_seed(random_seed)
 im_size = 224
 num_classes = 10
-net_type = 'alex'
-# net_type = 'res'
+# net_type = 'alex'
+net_type = 'res'
 norm = True
 dropout = True
-# loss_type = 'entropy'
-loss_type = 'hinge'
+loss_type = 'entropy'
+# loss_type = 'hinge'
 lr = 0.001
-num_ep = 200
+num_ep = 500
 
 
 root_dir = "caltech101_30"
@@ -68,9 +69,9 @@ test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 if net_type == 'alex':
     net = AlexNet(num_classes=num_classes, batch_norm=norm, dropout=dropout)
 else:
-    net = ResNet18(num_classes=num_classes)
+    net = ResNet34(num_classes=num_classes)
 
-net.to(device)    
+net.to(device)
 
 
 if loss_type == 'entropy':
@@ -79,6 +80,7 @@ else:
     criterion = nn.MultiMarginLoss()
 
 optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
 max_test = 0
 for epoch in range(num_ep):  # loop over the dataset multiple times
@@ -93,10 +95,13 @@ for epoch in range(num_ep):  # loop over the dataset multiple times
         loss.backward()
         optimizer.step()
         print(loss)
-    
+
+    if epoch % 100 == 0:
+        scheduler.step()
+
     correct = 0
     total = 0
-    
+
     with torch.no_grad():
         for data in test_loader:
             images, labels = data[0].to(device), data[1].to(device)
@@ -110,6 +115,3 @@ for epoch in range(num_ep):  # loop over the dataset multiple times
     if max_test < test_acc:
         max_test = test_acc
     print(f'Accuracy on the test images: {100 * test_acc} % | {max_test}')
-
-
-
