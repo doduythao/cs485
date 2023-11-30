@@ -54,20 +54,19 @@ class AlexNet(nn.Module):
         return x
 
 
-# Basic block for ResNet
 class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, in_channels, out_channels, stride=1):
         super(BasicBlock, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=5, 
+                               stride=stride, padding=2, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(out_channels, out_channels,
-                               kernel_size=3, stride=1, padding=1, bias=False)
+                               kernel_size=5, stride=1, padding=2, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         # Shortcut connection
@@ -112,6 +111,7 @@ class ResNet34(nn.Module):
         self.layer4 = self._make_layer(BasicBlock, 512, layers=3, stride=2)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(0.25)
         self.fc = nn.Linear(512 * BasicBlock.expansion, num_classes)
 
     def _make_layer(self, block, out_channels, layers, stride):
@@ -135,6 +135,7 @@ class ResNet34(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+        x = self.dropout(x)
         x = self.fc(x)
 
         return x

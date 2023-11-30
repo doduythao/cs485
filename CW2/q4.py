@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, random_split
 from models import AlexNet, ResNet34
 
 # Set a fixed random seed for reproducibility
-random_seed = 1
+random_seed = 42
 random.seed(random_seed)
 torch.manual_seed(random_seed)
 im_size = 224
@@ -26,7 +26,7 @@ dropout = True
 loss_type = 'entropy'
 # loss_type = 'hinge'
 lr = 0.001
-num_ep = 500
+num_ep = 1000
 
 
 root_dir = "caltech101_30"
@@ -43,7 +43,7 @@ train_dataset, test_dataset = random_split(
 
 # Define different augmentations for training and testing
 train_transform = transforms.Compose([
-    transforms.RandomResizedCrop((im_size, im_size), scale=(0.75, 1)),
+    transforms.RandomResizedCrop((im_size, im_size), scale=(0.7, 1)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.RandomPerspective(),
@@ -80,28 +80,21 @@ else:
     criterion = nn.MultiMarginLoss()
 
 optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
-scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
 max_test = 0
 for epoch in range(num_ep):  # loop over the dataset multiple times
     for data in train_loader:
         inputs, labels = data[0].to(device), data[1].to(device)
-
         optimizer.zero_grad()
-
-        # forward + backward + optimize
         outputs = net(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         print(loss)
 
-    if epoch % 100 == 0:
-        scheduler.step()
-
     correct = 0
     total = 0
-
     with torch.no_grad():
         for data in test_loader:
             images, labels = data[0].to(device), data[1].to(device)
@@ -115,3 +108,4 @@ for epoch in range(num_ep):  # loop over the dataset multiple times
     if max_test < test_acc:
         max_test = test_acc
     print(f'Accuracy on the test images: {100 * test_acc} % | {max_test}')
+    scheduler.step()
