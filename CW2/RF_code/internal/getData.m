@@ -7,7 +7,7 @@ function [ data_train, data_query ] = getData( MODE )
 %   3. Toy_Circle
 %   4. Caltech 101
 
-showImg = 1; % Show training & testing images and their image feature vector (histogram representation)
+showImg = 0; % Show training & testing images and their image feature vector (histogram representation)
 
 PHOW_Sizes = [4 8 10]; % Multi-resolution, these values determine the scale of each layer.
 PHOW_Step = 8; % The lower the denser. Select from {2,4,8,16}
@@ -128,19 +128,32 @@ switch MODE
         
         %% write your own codes here
         tic
-        % ...
 
+        % K-means clustering to create the visual vocabulary
+        [centers, ~] = vl_kmeans(desc_sel, numBins);
+        vocab = centers;
 
-        % ...
         toc
 
         disp('Encoding Images...')
         % Vector Quantisation
         
         %% write your own codes here
-        % ...
 
-        % ...
+        % Encoding training images
+        for c = 1:length(classList)
+            for i = 1:length(imgIdx_tr)
+                histogram_tr{c, i} = quantizeFeatures(desc_tr{c, i}, vocab);
+            end
+        end
+
+        % Encoding testing images
+        for c = 1:length(classList)
+            for i = 1:length(imgIdx_te)
+                histogram_te{c, i} = quantizeFeatures(desc_te{c, i}, vocab);
+            end
+        end
+
         toc
         
         % Clear unused varibles to save memory
@@ -209,5 +222,13 @@ switch MODE
         [x, y] = meshgrid(xrange(1):inc:xrange(2), yrange(1):inc:yrange(2));
         data_query = [x(:) y(:) zeros(length(x)^2,1)];
 end
+end
+
+% Function to quantize features to the nearest cluster
+function histogram = quantizeFeatures(features, vocab)
+    D = vl_alldist2(vocab, features);
+    [~, bins] = min(D, [], 1);
+    histogram = histc(bins, 1:size(vocab, 2));
+    histogram = histogram / sum(histogram); % Normalize the histogram
 end
 
