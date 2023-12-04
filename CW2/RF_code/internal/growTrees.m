@@ -40,7 +40,7 @@ for T = 1:param.num
                 tree(T).leaf(cnt).label = cnt_total;
                 prob = reshape(histc(data(tree(T).node(n).idx,end),labels),[],1);
 
-                tree(T).leaf(cnt).prob = prob; %.*prior; % Multiply by the prior probability of bootstrapped sub-training-set
+                tree(T).leaf(cnt).prob = prob.*prior; % Multiply by the prior probability of bootstrapped sub-training-set
                 tree(T).leaf(cnt).prob = tree(T).leaf(cnt).prob./sum(tree(T).leaf(cnt).prob); % Normalisation
                 
                 if strcmp(param.split,'Var')

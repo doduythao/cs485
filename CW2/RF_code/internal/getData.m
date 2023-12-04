@@ -7,10 +7,11 @@ function [ data_train, data_query ] = getData( MODE )
 %   3. Toy_Circle
 %   4. Caltech 101
 
-showImg = 0; % Show training & testing images and their image feature vector (histogram representation)
+showImg = 1; % Show training & testing images and their image feature vector (histogram representation)
+loadData = false;
 
 PHOW_Sizes = [4 8 10]; % Multi-resolution, these values determine the scale of each layer.
-PHOW_Step = 8; % The lower the denser. Select from {2,4,8,16}
+PHOW_Step = 2; % The lower the denser. Select from {2,4,8,16}
 
 switch MODE
     case 'Toy_Gaussian' % Gaussian distributed 2D points
@@ -78,86 +79,88 @@ switch MODE
         data_train = [X Y];
         
     case 'Caltech' % Caltech dataset
-        close all;
-        imgSel = [15 15]; % randomly select 15 images each class without replacement. (For both training & testing)
-        folderName = './Caltech_101/101_ObjectCategories';
-        classList = dir(folderName);
-        classList = {classList(3:end).name} % 10 classes
-        
-        disp('Loading training images...')
-        % Load Images -> Description (Dense SIFT)
-        cnt = 1;
-        if showImg
-            figure('Units','normalized','Position',[.05 .1 .4 .9]);
-            suptitle('Training image samples');
-        end
-        for c = 1:length(classList)
-            subFolderName = fullfile(folderName,classList{c});
-            imgList = dir(fullfile(subFolderName,'*.jpg'));
-            imgIdx{c} = randperm(length(imgList));
-            imgIdx_tr = imgIdx{c}(1:imgSel(1));
-            imgIdx_te = imgIdx{c}(imgSel(1)+1:sum(imgSel));
+        if ~loadData
+            close all;
+            imgSel = [15 15]; % randomly select 15 images each class without replacement. (For both training & testing)
+            folderName = './Caltech_101/101_ObjectCategories';
+            classList = dir(folderName);
+            classList = {classList(3:end).name} % 10 classes
             
-            for i = 1:length(imgIdx_tr)
-                I = imread(fullfile(subFolderName,imgList(imgIdx_tr(i)).name));
+            disp('Loading training images...')
+            % Load Images -> Description (Dense SIFT)
+            cnt = 1;
+            if showImg
+                figure('Units','normalized','Position',[.05 .1 .4 .9]);
+                suptitle('Training image samples');
+            end
+            for c = 1:length(classList)
+                subFolderName = fullfile(folderName,classList{c});
+                imgList = dir(fullfile(subFolderName,'*.jpg'));
+                imgIdx{c} = randperm(length(imgList));
+                imgIdx_tr = imgIdx{c}(1:imgSel(1));
+                imgIdx_te = imgIdx{c}(imgSel(1)+1:sum(imgSel));
                 
-                % Visualise
-                if i < 6 & showImg
-                    subaxis(length(classList),5,cnt,'SpacingVert',0,'MR',0);
-                    imshow(I);
-                    cnt = cnt+1;
-                    drawnow;
+                for i = 1:length(imgIdx_tr)
+                    I = imread(fullfile(subFolderName,imgList(imgIdx_tr(i)).name));
+                    
+                    % Visualise
+                    if i < 6 & showImg
+                        subaxis(length(classList),5,cnt,'SpacingVert',0,'MR',0);
+                        imshow(I);
+                        cnt = cnt+1;
+                        drawnow;
+                    end
+                    
+                    if size(I,3) == 3
+                        I = rgb2gray(I); % PHOW work on gray scale image
+                    end
+                    
+                    % For details of image description, see http://www.vlfeat.org/matlab/vl_phow.html
+                    [~, desc_tr{c,i}] = vl_phow(single(I),'Sizes',PHOW_Sizes,'Step',PHOW_Step); %  extracts PHOW features (multi-scaled Dense SIFT)
                 end
-                
-                if size(I,3) == 3
-                    I = rgb2gray(I); % PHOW work on gray scale image
+            end
+        end
+        
+        if ~loadData
+            disp('Building visual codebook...')
+            % Build visual vocabulary (codebook) for 'Bag-of-Words method'
+            desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e4)); % Randomly select 100k SIFT descriptors for clustering
+            
+            % K-means clustering
+            numBins = 1024; % for instance,
+            
+            
+            %% write your own codes here
+            tic
+
+            % K-means clustering to create the visual vocabulary
+            [centers, ~] = vl_kmeans(desc_sel, numBins);
+            vocab = centers
+
+            toc
+
+            disp('Encoding Images...')
+            % Vector Quantisation
+            
+            %% write your own codes here
+            for c = 1:length(classList)
+                for i = 1:length(imgIdx_tr)
+                    hist = quantizeFeatures(desc_tr{c, i}, vocab);
+                    for k = 1:numBins
+                        histogram_tr{c, i, k} = hist(k);
+                    end
                 end
-                
-                % For details of image description, see http://www.vlfeat.org/matlab/vl_phow.html
-                [~, desc_tr{c,i}] = vl_phow(single(I),'Sizes',PHOW_Sizes,'Step',PHOW_Step); %  extracts PHOW features (multi-scaled Dense SIFT)
-            end
+            end        
+
+            % Encoding training images
+
+
+            toc
+        
+        
+            % Clear unused varibles to save memory
+            clearvars desc_tr desc_sel
         end
-        
-        disp('Building visual codebook...')
-        % Build visual vocabulary (codebook) for 'Bag-of-Words method'
-        desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e4)); % Randomly select 100k SIFT descriptors for clustering
-        
-        % K-means clustering
-        numBins = 4096; % for instance,
-        
-        
-        %% write your own codes here
-        tic
-
-        % K-means clustering to create the visual vocabulary
-        [centers, ~] = vl_kmeans(desc_sel, numBins);
-        vocab = centers;
-
-        toc
-
-        disp('Encoding Images...')
-        % Vector Quantisation
-        
-        %% write your own codes here
-
-        % Encoding training images
-        for c = 1:length(classList)
-            for i = 1:length(imgIdx_tr)
-                histogram_tr{c, i} = quantizeFeatures(desc_tr{c, i}, vocab);
-            end
-        end
-
-        % Encoding testing images
-        for c = 1:length(classList)
-            for i = 1:length(imgIdx_te)
-                histogram_te{c, i} = quantizeFeatures(desc_te{c, i}, vocab);
-            end
-        end
-
-        toc
-        
-        % Clear unused varibles to save memory
-        clearvars desc_tr desc_sel
 end
 
 switch MODE
@@ -166,44 +169,98 @@ switch MODE
         figure('Units','normalized','Position',[.05 .1 .4 .9]);
         suptitle('Test image samples');
         end
-        disp('Processing testing images...');
-        cnt = 1;
-        % Load Images -> Description (Dense SIFT)
-        for c = 1:length(classList)
-            subFolderName = fullfile(folderName,classList{c});
-            imgList = dir(fullfile(subFolderName,'*.jpg'));
-            imgIdx_te = imgIdx{c}(imgSel(1)+1:sum(imgSel));
-            
-            for i = 1:length(imgIdx_te)
-                I = imread(fullfile(subFolderName,imgList(imgIdx_te(i)).name));
+        if ~loadData
+            disp('Processing testing images...');
+            cnt = 1;
+            % Load Images -> Description (Dense SIFT)
+            for c = 1:length(classList)
+                subFolderName = fullfile(folderName,classList{c});
+                imgList = dir(fullfile(subFolderName,'*.jpg'));
+                imgIdx_te = imgIdx{c}(imgSel(1)+1:sum(imgSel));
                 
-                % Visualise
-                if i < 6 & showImg
-                    subaxis(length(classList),5,cnt,'SpacingVert',0,'MR',0);
-                    imshow(I);
-                    cnt = cnt+1;
-                    drawnow;
-                end
+                for i = 1:length(imgIdx_te)
+                    I = imread(fullfile(subFolderName,imgList(imgIdx_te(i)).name));
+                    
+                    % Visualise
+                    if i < 6 & showImg
+                        subaxis(length(classList),5,cnt,'SpacingVert',0,'MR',0);
+                        imshow(I);
+                        cnt = cnt+1;
+                        drawnow;
+                    end
+                    
+                    if size(I,3) == 3
+                        I = rgb2gray(I);
+                    end
+                    [~, desc_te{c,i}] = vl_phow(single(I),'Sizes',PHOW_Sizes,'Step',PHOW_Step);
                 
-                if size(I,3) == 3
-                    I = rgb2gray(I);
                 end
-                [~, desc_te{c,i}] = vl_phow(single(I),'Sizes',PHOW_Sizes,'Step',PHOW_Step);
-            
             end
+
+            % Quantisation
+            
+            %% write your own codes here
+            tic
+
+            % Quantize the testing images
+            for c = 1:length(classList)
+                for i = 1:length(imgIdx_te)
+                    hist = quantizeFeatures(desc_te{c, i}, vocab);
+                    for k = 1:numBins
+                        histogram_te{c, i, k} = hist(k);
+                    end
+                end
+            end
+
+            toc
+            % Visualize histograms of example training/testing images
         end
 
-        % Quantisation
+        if loadData
+            load('histogram_tr.mat');
+            load('histogram_te.mat');
+        else
+            histogram_tr = reshape(histogram_tr, 150, numBins);
+            histogram_te = reshape(histogram_te, 150, numBins);
+            histogram_tr = cell2mat(histogram_tr);
+            histogram_te = cell2mat(histogram_te);
+            save('histogram_tr.mat', 'histogram_tr');
+            save('histogram_te.mat', 'histogram_te');
+        end
+        if showImg
+            numClasses = 10; % Assuming 10 classes
+            numExamplesPerClass = 15; % Assuming 15 examples per class in the merged histogram
+            totalExamples = numClasses * numExamplesPerClass; % Total number of examples (150 in this case)
         
-        %% write your own codes here
-        tic
-        % ...
+            % Randomly select two different classes for visualization
+            selectedClasses = randperm(numClasses, 2);
         
-        % ...
-        toc
+            figure('Units','normalized','Position',[.05 .1 .4 .9]);
+            suptitle('Bag-of-Words Histograms of Example Images');
         
-
-        %% Save the histogram data.
+            for i = 1:2 % Only two classes will be visualized
+                c = selectedClasses(i);
+        
+                % Calculate the index range for the current class
+                classIdxStart = (c - 1) * numExamplesPerClass + 1;
+                classIdxEnd = c * numExamplesPerClass;
+        
+                % Randomly select an example image index from the current class
+                exampleIdx = randi([classIdxStart, classIdxEnd]);
+        
+                % Histogram for the selected training image
+                subplot(2, 2, i);
+                bar(histogram_tr(exampleIdx, :));
+                title(['Class ' num2str(c) ' Train Img ' num2str(exampleIdx)]);
+        
+                % Histogram for the selected testing image (assuming similar arrangement for histogram_te)
+                subplot(2, 2, 2 + i);
+                bar(histogram_te(exampleIdx, :)); % Replace with appropriate indexing if histogram_te differs
+                title(['Class ' num2str(c) ' Test Img ' num2str(exampleIdx)]);
+            end
+            disp('Press any key to continue');
+            pause;
+        end
         label_train = ones(size(histogram_tr, 1), 1);
         label_query = ones(size(histogram_te, 1), 1);
         for i = 1:10
@@ -212,9 +269,9 @@ switch MODE
         end
         data_train = histogram_tr;
         data_query = histogram_te;
-
         data_train(:,size(data_train,2)+1) = label_train;
         data_query(:,size(data_query,2)+1) = label_query;
+
     otherwise % Dense point for 2D toy data
         xrange = [-1.5 1.5];
         yrange = [-1.5 1.5];
@@ -224,11 +281,9 @@ switch MODE
 end
 end
 
-% Function to quantize features to the nearest cluster
 function histogram = quantizeFeatures(features, vocab)
-    D = vl_alldist2(vocab, features);
+    D = vl_alldist2(vocab, single(features));
     [~, bins] = min(D, [], 1);
-    histogram = histc(bins, 1:size(vocab, 2));
-    histogram = histogram / sum(histogram); % Normalize the histogram
+    histogram = histcounts(bins, 1:(size(vocab, 2)+1));
+    % histogram = histogram / sum(histogram);
 end
-
