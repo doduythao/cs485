@@ -1,4 +1,4 @@
-function [ data_train, data_query ] = getData( MODE )
+function [ data_train, data_query ] = getData_RFcodebook( MODE )
 % Generate training and testing data
 
 % Data Options:
@@ -122,21 +122,38 @@ switch MODE
         end
         
         if ~loadData
-            disp('Building visual codebook...')
-            % Build visual vocabulary (codebook) for 'Bag-of-Words method'
-            desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e3)); % Randomly select 100k SIFT descriptors for clustering
+            disp('Building visual codebook using Random Forest...')
+            % Combine all descriptors and their corresponding labels
+            allDesc = [];
+            allLabels = [];
+            for c = 1:length(classList)
+                for i = 1:length(imgIdx_tr(c))
+                    allDesc = [allDesc, desc_tr{c, i}];
+                    allLabels = [allLabels; c * ones(size(desc_tr{c, i}, 2), 1)];
+                end
+            end
             
-            % K-means clustering
-            numBins = 512; % for instance,
+            % Randomly select descriptors
+            numDescriptorsToSelect = 10e3; % for example, 10000 descriptors
+            selectedIndices = vl_colsubset(1:size(allDesc, 2), numDescriptorsToSelect);
+            
+            % Create desc_sel with descriptors and labels
+            desc_sel = single(allDesc(:, selectedIndices));
+            labels_sel = allLabels(selectedIndices);
+            desc_sel_rf = [desc_sel; labels_sel']';  % Append labels as the last row
+            param.num = 10;     % number of trees
+            param.depth = 13;    % trees depth
+            param.splitNum = 20; % Number of trials in split function
+            param.split = 'IG'; % Currently support 'information gain' only
+            size(desc_sel_rf)
+
             
             
             %% write your own codes here
             tic
 
             % K-means clustering to create the visual vocabulary
-            [centers, ~] = vl_kmeans(desc_sel, numBins);
-            vocab = centers
-            disp(size(centers))
+            trees = growTrees(desc_sel_rf,param);
 
             toc
 
@@ -146,18 +163,21 @@ switch MODE
             %% write your own codes here
             for c = 1:length(classList)
                 for i = 1:length(imgIdx_tr)
-                    hist = quantizeFeatures(desc_tr{c, i}, vocab);
-                    for k = 1:numBins
-                        histogram_tr{c, i, k} = hist(k);
-                    end
+                    size(desc_tr{c, i}')
+                    hist = testTrees_fast(desc_tr{c, i}', trees);
+                    size(hist)
+                    hist = reshape(hist, [1, size(hist, 1)*param.num])
+                    histogram_tr =
                 end
-            end        
+            end
+            % disp(size(trees))
+            % disp(size(desc_tr{1, 1}))
+            % histogram_tr = testTrees_fast(desc_tr, trees);
+            % disp(size(histogram_tr))
 
             % Encoding training images
 
-
             toc
-        
         
             % Clear unused varibles to save memory
             clearvars desc_tr desc_sel
@@ -284,11 +304,9 @@ end
 
 function histogram = quantizeFeatures(features, vocab)
     % disp(single(features))
-    features = single(features)
-    disp(size(feature)
-    D = vl_alldist2(vocab, single(features));
-
-    disp(size(D))
+    features = single(features);
+    D = pdist2(vocab', features', 'euclidean');
+    % disp(size(D))
     [~, bins] = min(D, [], 1);
     histogram = histcounts(bins, 1:(size(vocab, 2)+1));
     histogram = histogram / sum(histogram);

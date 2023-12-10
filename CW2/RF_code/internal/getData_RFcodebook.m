@@ -1,4 +1,4 @@
-function [ data_train, data_query ] = getData( MODE )
+function [ data_train, data_query ] = getData_RFcodebook( MODE )
 % Generate training and testing data
 
 % Data Options:
@@ -122,43 +122,84 @@ switch MODE
         end
         
         if ~loadData
-            disp('Building visual codebook...')
-            % Build visual vocabulary (codebook) for 'Bag-of-Words method'
-            desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e3)); % Randomly select 100k SIFT descriptors for clustering
+            disp('Building visual codebook using Random Forest...')
+            % Combine all descriptors and their corresponding labels
+            allDesc = [];
+            allLabels = [];
+            for c = 1:length(classList)
+                for i = 1:length(imgIdx_tr(c))
+                    allDesc = [allDesc, desc_tr{c, i}];
+                    allLabels = [allLabels; c * ones(size(desc_tr{c, i}, 2), 1)];
+                end
+            end
             
-            % K-means clustering
-            numBins = 512; % for instance,
+            % Randomly select descriptors
+            numDescriptorsToSelect = 10e3; % for example, 10000 descriptors
+            selectedIndices = vl_colsubset(1:size(allDesc, 2), numDescriptorsToSelect);
+            
+            % Create desc_sel with descriptors and labels
+            desc_sel = single(allDesc(:, selectedIndices));
+            labels_sel = allLabels(selectedIndices);
+            desc_sel_rf = [desc_sel; labels_sel']';  % Append labels as the last row
+            param.num = 10;     % number of trees
+            param.depth = 13;    % trees depth
+            param.splitNum = 20; % Number of trials in split function
+            param.split = 'IG'; % Currently support 'information gain' only
+            % size(desc_sel_rf)
+
             
             
             %% write your own codes here
             tic
 
             % K-means clustering to create the visual vocabulary
-            [centers, ~] = vl_kmeans(desc_sel, numBins);
-            vocab = centers;
-            disp(size(centers))
+            % disp(desc_sel_rf(:,end))
+            [trees, max_leaf_idx] = growTrees(desc_sel_rf,param);
 
             toc
+            % max_leaf_idx = 0;
+            % 
+            % % Loop through each tree in the forest
+            % for T = 1:length(trees)
+            %     tree = trees(T);
+            % 
+            %     % Loop through each node in the tree
+            %     for i = 1:length(tree.nodes)
+            %         node = tree.nodes(i);
+            % 
+            %         % Check if the current node is a leaf
+            %         if isfield(node, 'leaf_idx') && ~isempty(node.leaf_idx)
+            %             % Update max_leaf_idx if the current leaf's index is greater
+            %             max_leaf_idx = max(max_leaf_idx, node.leaf_idx);
+            %         end
+            %     end
+            % end
 
             disp('Encoding Images...')
             % Vector Quantisation
             
             %% write your own codes here
+            histogram_tr = cell(length(classList), length(imgIdx_tr));
             for c = 1:length(classList)
                 for i = 1:length(imgIdx_tr)
-                    hist = quantizeFeatures(desc_tr{c, i}, vocab);
-                    for k = 1:numBins
-                        histogram_tr{c, i, k} = hist(k);
+                    picks = testTrees_fast(desc_tr{c, i}', trees);
+                    % assignin('base', "hist", hist)
+                    % size(hist)
+                    picks = reshape(picks, [1, size(picks, 1)*param.num]);
+                    hist = quantizeFeatures(picks, max_leaf_idx);
+                    for t = 1:max_leaf_idx
+                        histogram_tr{c, i, t} = hist(t);
                     end
                 end
-            end        
+            end
+            % disp(size(trees))
+            % disp(size(desc_tr{1, 1}))
+            % histogram_tr = testTrees_fast(desc_tr, trees);
+            % disp(size(histogram_tr))
 
             % Encoding training images
 
-
             toc
-            disp(size(histogram_tr))
-        
         
             % Clear unused varibles to save memory
             clearvars desc_tr desc_sel
@@ -205,11 +246,16 @@ switch MODE
             tic
 
             % Quantize the testing images
+            histogram_te = cell(length(classList), length(imgIdx_te));
             for c = 1:length(classList)
                 for i = 1:length(imgIdx_te)
-                    hist = quantizeFeatures(desc_te{c, i}, vocab);
-                    for k = 1:numBins
-                        histogram_te{c, i, k} = hist(k);
+                    picks = testTrees_fast(desc_te{c, i}', trees);
+                    % assignin('base', "hist", hist)
+                    % size(hist)
+                    picks = reshape(picks, [1, size(picks, 1)*param.num]);
+                    hist = quantizeFeatures(picks, max_leaf_idx);
+                    for t = 1:max_leaf_idx
+                        histogram_te{c, i, t} = hist(t);
                     end
                 end
             end
@@ -219,15 +265,16 @@ switch MODE
         end
 
         if loadData
-            load('histogram_tr.mat');
-            load('histogram_te.mat');
+            load('histogram_tr_rf.mat');
+            load('histogram_te_rf.mat');
         else
-            histogram_tr = reshape(histogram_tr, 150, numBins);
-            histogram_te = reshape(histogram_te, 150, numBins);
+            size(histogram_tr)
+            histogram_tr = reshape(histogram_tr, 150, max_leaf_idx);
+            histogram_te = reshape(histogram_te, 150, max_leaf_idx);
             histogram_tr = cell2mat(histogram_tr);
             histogram_te = cell2mat(histogram_te);
-            save('histogram_tr.mat', 'histogram_tr');
-            save('histogram_te.mat', 'histogram_te');
+            save('histogram_tr_rf.mat', 'histogram_tr');
+            save('histogram_te_rf.mat', 'histogram_te');
         end
         if showImg
             numClasses = 10; % Assuming 10 classes
@@ -283,12 +330,18 @@ switch MODE
 end
 end
 
-function histogram = quantizeFeatures(features, vocab)
-    % disp(single(features))
-    features = single(features);
-    D = pdist2(vocab', features', 'euclidean');
-    % disp(size(D))
-    [~, bins] = min(D, [], 1);
-    histogram = histcounts(bins, 1:(size(vocab, 2)+1));
-    histogram = histogram / sum(histogram);
+function histogram = quantizeFeatures(picks, max_leaf_index)
+    % Initialize the histogram with zeros. Each bin corresponds to a leaf index.
+    histogram = zeros(1, max_leaf_index);
+    
+    % Loop through each element in 'picks'
+    for i = 1:length(picks)
+        leaf_index = picks(i);
+        
+        % Check if the leaf index is within the valid range
+        if leaf_index >= 1 && leaf_index <= max_leaf_index
+            % Increment the corresponding histogram bin
+            histogram(leaf_index) = histogram(leaf_index) + 1;
+        end
+    end
 end

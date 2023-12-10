@@ -249,9 +249,9 @@ if playWithToys
 end
 %% 5. Experiment with Caltech dataset for image categorisation (Coursework 2)
 clear all;
-param.num = 200;     % number of trees
+param.num = 100;     % number of trees
 param.depth = 15;    % trees depth
-param.splitNum = 10; % Number of trials in split function
+param.splitNum = 20; % Number of trials in split function
 param.split = 'IG'; % Currently support 'information gain' only
 
 % Complete getData.m by writing your own lines of code to obtain the visual 
