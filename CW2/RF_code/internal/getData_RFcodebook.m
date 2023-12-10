@@ -134,7 +134,7 @@ switch MODE
             end
             
             % Randomly select descriptors
-            numDescriptorsToSelect = 10e3; % for example, 10000 descriptors
+            numDescriptorsToSelect = 10e4;
             selectedIndices = vl_colsubset(1:size(allDesc, 2), numDescriptorsToSelect);
             
             % Create desc_sel with descriptors and labels
