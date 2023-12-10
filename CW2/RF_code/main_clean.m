@@ -28,17 +28,17 @@ clear all; close all;
 % Initialisation
 init; clc;
 
-param.num = 100;     % number of trees
-param.depth = 20;    % trees depth
-param.splitNum = 30; % Number of trials in split function
+param.num = 120;     % number of trees
+param.depth = 13;    % trees depth
+param.splitNum = 6; % Number of trials in split function
 param.split = 'IG'; % Currently support 'information gain' only
 
 % Complete getData.m by writing your own lines of code to obtain the visual 
 % vocabulary and the bag-of-words histograms for both training and testing data. 
 % You can use any existing code for K-means (note different codes require different memory and computation time).
 
-% [data_train, data_test] = getData('Caltech');
-[data_train, data_test] = getData_RFcodebook('Caltech');
+[data_train, data_test] = getData('Caltech');
+% [data_train, data_test] = getData_RFcodebook('Caltech');
 % data_test = data_train;
 
 close all;

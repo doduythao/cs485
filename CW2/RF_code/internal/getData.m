@@ -124,10 +124,10 @@ switch MODE
         if ~loadData
             disp('Building visual codebook...')
             % Build visual vocabulary (codebook) for 'Bag-of-Words method'
-            desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e3)); % Randomly select 100k SIFT descriptors for clustering
+            desc_sel = single(vl_colsubset(cat(2,desc_tr{:}), 10e4)); % Randomly select 100k SIFT descriptors for clustering
             
             % K-means clustering
-            numBins = 512; % for instance,
+            numBins = 128; % for instance,
             
             
             %% write your own codes here
@@ -222,6 +222,8 @@ switch MODE
             load('histogram_tr.mat');
             load('histogram_te.mat');
         else
+            histogram_tr = permute(histogram_tr, [2, 1, 3]);
+            histogram_te = permute(histogram_te, [2, 1, 3]);
             histogram_tr = reshape(histogram_tr, 150, numBins);
             histogram_te = reshape(histogram_te, 150, numBins);
             histogram_tr = cell2mat(histogram_tr);
