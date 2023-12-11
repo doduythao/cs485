@@ -7,7 +7,8 @@ function [ data_train, data_query ] = getData( MODE )
 %   3. Toy_Circle
 %   4. Caltech 101
 
-showImg = 1; % Show training & testing images and their image feature vector (histogram representation)
+showImg = 0; % Show training & testing images and their image feature vector (histogram representation)
+% no show image for quick running
 loadData = false;
 
 PHOW_Sizes = [4 6 8 10]; % Multi-resolution, these values determine the scale of each layer.
