@@ -27,7 +27,7 @@
 clear all; close all; 
 % Initialisation
 init; clc;
-rng(2,"twister"); % for fixed random seed using generator algorithm to Mersenne Twister.
+rng(3,"twister"); % for fixed random seed using generator algorithm to Mersenne Twister
 
 param.num = 120;     % number of trees
 param.depth = 13;    % trees depth
